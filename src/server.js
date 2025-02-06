@@ -1,7 +1,6 @@
 import express from "express";
 import axios from "axios";
 import cors from "cors";
-import compression from 'compression';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -9,24 +8,19 @@ const PORT = process.env.PORT || 3000;
 // Enable CORS
 app.use(cors());
 
-//Compress all my responses
-app.use(compression());
-
-
 // Middleware to parse JSON requests
 app.use(express.json());
 
 app.get("/api-classify-number", async (req, res) => {
     const { n } = req.query;
 
-    // Ensure 'n' is a valid number
     if (!n || isNaN(n)) {
         return res.status(400).json({
             number: n,
             error: true,
-            message: "The query parameter 'n' must be a valid number."
         });
     }
+
     const num = parseInt(n, 10);
 
     // Check number properties
@@ -53,7 +47,6 @@ app.get("/api-classify-number", async (req, res) => {
     } catch (error) {
         res.status(500).json({
             error: "Unable to fetch fun fact",
-            message: error.message || "Internal Server Error",
         });
     }
 });
