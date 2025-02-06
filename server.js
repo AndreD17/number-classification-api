@@ -17,10 +17,12 @@ app.use(express.json());
 // Middleware to validate number input
 const validateNumber = (req, res, next) => {
     const { n } = req.query;
-    if (!n || isNaN(n)) {
-        return res.status(400).json({ error: "Invalid number provided" });
-    }
-    req.num = parseInt(n, 10);
+    if (!n || !/^-?\d+$/.test(n)) {
+        return res.status(400).json({
+            error: true,
+            message: "Invalid input. Only integers are allowed.",
+        });
+    }    
     next();
 };
 
