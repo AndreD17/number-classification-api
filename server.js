@@ -1,46 +1,89 @@
 import express from "express";
 import axios from "axios";
 import cors from "cors";
-import compression from 'compression';
+import compression from "compression";
+import NodeCache from "node-cache";
+import { checkPrime, checkPerfect, checkArmstrong, getDigitsSum, classifyProperties } from "./src/utils.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const cache = new NodeCache({ stdTTL: 86400 }); // Cache responses for 24 hours
 
-// Enable CORS
+// Middleware
 app.use(cors());
-
-//Compress all my responses
 app.use(compression());
-
-
-// Middleware to parse JSON requests
 app.use(express.json());
 
-app.get("/api-classify-number", async (req, res) => {
+// Middleware to validate number input
+const validateNumber = (req, res, next) => {
     const { n } = req.query;
-
-    // Ensure 'n' is a valid number
     if (!n || isNaN(n)) {
-        return res.status(400).json({
-            number: n,
-            error: true,
-            message: "The query parameter 'n' must be a valid number."
-        });
+        return res.status(400).json({ error: "Invalid number provided" });
     }
-    const num = parseInt(n, 10);
+    req.num = parseInt(n, 10);
+    next();
+};
 
-    // Check number properties
+// Cache for external API responses
+const externalCache = new NodeCache({ stdTTL: 86400 }); // Cache for 24 hours
+
+// Fetch fun fact from Numbers API (with caching)
+const fetchFunFact = async (n) => {
+    const cacheKey = `funFact-${n}`;
+    const cachedData = externalCache.get(cacheKey);
+    if (cachedData) return cachedData;
+
+    try {
+        const response = await axios.get(`http://numbersapi.com/${n}`);
+        externalCache.set(cacheKey, response.data);
+        return response.data;
+    } catch {
+        return "No fun fact available.";
+    }
+};
+
+// Fetch parity information from Wikipedia API (with caching)
+const fetchParityInfo = async () => {
+    const cacheKey = "parityInfo";
+    const cachedData = externalCache.get(cacheKey);
+    if (cachedData) return cachedData;
+
+    try {
+        const response = await axios.get(
+            "https://en.wikipedia.org/api/rest_v1/page/summary/Parity_(mathematics)"
+        );
+        const parityInfo = response.data.extract || "No parity information available.";
+        externalCache.set(cacheKey, parityInfo);
+        return parityInfo;
+    } catch {
+        return "No parity information available.";
+    }
+};
+
+app.get("/api-classify-number", validateNumber, async (req, res) => {
+    const num = req.num;
+
+    // Check cache first
+    const cachedData = cache.get(num);
+    if (cachedData) {
+        return res.json(cachedData);
+    }
+
+    // Perform calculations
     const isPrime = checkPrime(num);
     const isPerfect = checkPerfect(num);
     const isArmstrong = checkArmstrong(num);
     const digitSum = getDigitsSum(num);
     const properties = classifyProperties(num, isArmstrong);
 
+    // Fetch data in parallel
     try {
-        const funFact = await fetchFunFact(num);
-        const parityInfo = await checkParityInfo(num);
+        const [funFact, parityInfo] = await Promise.all([
+            fetchFunFact(num),
+            fetchParityInfo()
+        ]);
 
-        res.json({
+        const responseData = {
             number: num,
             is_prime: isPrime,
             is_perfect: isPerfect,
@@ -49,79 +92,16 @@ app.get("/api-classify-number", async (req, res) => {
             digit_sum: digitSum,
             fun_fact: funFact,
             parity_info: parityInfo,
-        });
+        };
+
+        // Store response in cache
+        cache.set(num, responseData);
+        res.json(responseData);
     } catch (error) {
-        res.status(500).json({
-            error: "Unable to fetch fun fact",
-            message: error.message || "Internal Server Error",
-        });
+        res.status(500).json({ error: "Unable to fetch external data" });
     }
 });
 
-// Check if number is prime
-function checkPrime(n) {
-    if (n < 2) return false;
-    for (let i = 2; i <= Math.sqrt(n); i++) {
-        if (n % i === 0) return false;
-    }
-    return true;
-}
-
-// Check if number is perfect
-function checkPerfect(n) {
-    let sum = 1;
-    for (let i = 2; i <= Math.sqrt(n); i++) {
-        if (n % i === 0) {
-            sum += i + (i !== n / i ? n / i : 0);
-        }
-    }
-    return sum === n && n !== 1;
-}
-
-// Check if number is an Armstrong number
-function checkArmstrong(n) {
-    const digits = n.toString().split("");
-    const power = digits.length;
-    const sum = digits.reduce((acc, digit) => acc + Math.pow(parseInt(digit), power), 0);
-    return sum === n;
-}
-
-// Calculate sum of digits
-function getDigitsSum(n) {
-    return n.toString().split("").reduce((sum, digit) => sum + parseInt(digit), 0);
-}
-
-// Determine properties of number
-function classifyProperties(n, isArmstrong) {
-    let properties = [];
-    if (isArmstrong) properties.push("armstrong");
-    properties.push(n % 2 === 0 ? "even" : "odd");
-    properties.push(n >= 1 ? "positive" : "negative");
-    return properties;
-}
-
-// Fetch fun fact from Numbers API
-async function fetchFunFact(n) {
-    try {
-        const response = await axios.get(`http://numbersapi.com/${n}`);
-        return response.data;
-    } catch (error) {
-        return "No fun fact available.";
-    }
-}
-
-// Fetch parity information from Wikipedia API
-async function checkParityInfo(n) {
-    try {
-        const response = await axios.get(
-            `https://en.wikipedia.org/api/rest_v1/page/summary/Parity_(mathematics)`
-        );
-        return response.data.extract || "No parity information available.";
-    } catch (error) {
-        return "No parity information available.";
-    }
-}
-
 app.listen(PORT, () => {
-    console.log(`Server is listening on port Http://Localhost:${PORT}`);
+    console.log(`Server is running at http://localhost:${PORT}`);
 });
