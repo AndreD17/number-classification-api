@@ -14,17 +14,20 @@ app.use(cors());
 app.use(compression());
 app.use(express.json());
 
+
 // Middleware to validate number input
 const validateNumber = (req, res, next) => {
     const { n } = req.query;
+
+    // Check if n is not provided or it's not an integer
     if (!n || !/^-?\d+$/.test(n)) {
-        return res.status(400).json({
-            error: true,
-            message: "Invalid input. Only integers are allowed.",
-        });
-    }    
+        return res.status(400).json({ error: "Invalid input. Only integers are allowed." });
+    }
+
+    req.num = parseInt(n, 10); // Parse as integer
     next();
 };
+
 
 // Cache for external API responses
 const externalCache = new NodeCache({ stdTTL: 86400 }); // Cache for 24 hours
