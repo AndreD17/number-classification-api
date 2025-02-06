@@ -1,4 +1,4 @@
-import express from "express"; 
+import express from "express";
 import axios from "axios";
 import cors from "cors";
 import compression from "compression";
@@ -16,14 +16,16 @@ app.use(express.json());
 
 // Middleware to validate number input
 const validateNumber = (req, res, next) => {
-    const { n } = req.query;
+    const { n } = req.query; // 
 
     // Check if n is not provided or it's not an integer
     if (!n || !/^-?\d+$/.test(n)) {
-        return res.status(400).json({ error: "Invalid input. Only integers are allowed." });
+        return res.status(400).json({
+            number: n || null,
+            error: true,
+        });
     }
-
-    req.num = parseInt(n, 10); // Parse as integer
+    req.num = parseInt(n, 10);
     next();
 };
 
@@ -31,35 +33,33 @@ const validateNumber = (req, res, next) => {
 const externalCache = new NodeCache({ stdTTL: 86400 }); // Cache for 24 hours
 
 // Fetch fun fact from Numbers API (with caching)
-const fetchFunFact = async (n) => {
-    const cacheKey = `funFact-${n}`;  // Corrected interpolation
+const fetchFunFact = async (n, isArmstrong) => {
+    const cacheKey = `funFact-${n}`;
     const cachedData = externalCache.get(cacheKey);
     if (cachedData) return cachedData;
 
     try {
-        const response = await axios.get(`http://numbersapi.com/${n}`);  // Corrected interpolation
-        externalCache.set(cacheKey, response.data);
-        return response.data;
+        // Fetch both API responses in parallel
+        const [numbersApiResponse, wikipediaResponse] = await Promise.all([
+            axios.get(`http://numbersapi.com/${n}?json`).then(res => res.data.text),
+            axios.get("https://en.wikipedia.org/api/rest_v1/page/summary/Parity_(mathematics)")
+                .then(res => res.data.extract)
+                .catch(() => "")
+        ]);
+
+        // If Armstrong, replace Wikipedia info with the Armstrong breakdown
+        let funFact = numbersApiResponse;
+        if (isArmstrong) {
+            const armstrongCalculation = getArmstrongCalculation(n);
+            funFact += ` It is an Armstrong number because: ${armstrongCalculation}.`;
+        } else {
+            funFact += wikipediaResponse ? ` ${wikipediaResponse}` : "";
+        }
+
+        externalCache.set(cacheKey, funFact);
+        return funFact;
     } catch {
         return "No fun fact available.";
-    }
-};
-
-// Fetch parity information from Wikipedia API (with caching)
-const fetchParityInfo = async () => {
-    const cacheKey = "parityInfo";
-    const cachedData = externalCache.get(cacheKey);
-    if (cachedData) return cachedData;
-
-    try {
-        const response = await axios.get(
-            "https://en.wikipedia.org/wiki/Parity_(mathematics)"
-        );
-        const parityInfo = response.data.extract || "No parity information available.";
-        externalCache.set(cacheKey, parityInfo);
-        return parityInfo;
-    } catch {
-        return "No parity information available.";
     }
 };
 
@@ -77,13 +77,14 @@ app.get("/api-classify-number", validateNumber, async (req, res) => {
     const isPerfect = checkPerfect(num);
     const isArmstrong = checkArmstrong(num);
     const digitSum = getDigitsSum(num);
-    const properties = classifyProperties(num, isArmstrong);
+
+    // Pass "armstrong" if the number is Armstrong, or "null" if it is not
+    const properties = classifyProperties(num, isArmstrong ? "armstrong" : null);
 
     // Fetch data in parallel
     try {
         const [funFact, parityInfo] = await Promise.all([
             fetchFunFact(num),
-            fetchParityInfo()
         ]);
 
         const responseData = {
@@ -91,9 +92,8 @@ app.get("/api-classify-number", validateNumber, async (req, res) => {
             is_prime: isPrime,
             is_perfect: isPerfect,
             properties,
-            digit_sum: digitSum,
-            fun_fact: funFact,
-            parity_info: parityInfo,
+            digit_sum: `${digitSum} // sum of its digits`,
+            fun_fact:`${funFact} // gotten from number api`,
         };
 
         // Store response in cache
@@ -102,6 +102,14 @@ app.get("/api-classify-number", validateNumber, async (req, res) => {
     } catch (error) {
         res.status(500).json({ error: "Unable to fetch external data" });
     }
+});
+
+// Catch-all Route for Invalid URLs
+app.use((req, res) => {
+    res.status(400).json({
+        error: true,
+        message: "Invalid request Check the endpoint and parameters.",
+    });
 });
 
 app.listen(PORT, () => {

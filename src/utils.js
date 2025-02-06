@@ -7,6 +7,7 @@ export const checkPrime = (n) => {
     return true;
 };
 
+
 // Check if a number is perfect
 export const checkPerfect = (n) => {
     if (n < 2) return false;
