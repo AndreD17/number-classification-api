@@ -1,56 +1,52 @@
-This API analyzes a number and returns its mathematical properties, a fun fact, and parity information. It is built using Node.js and Express, and it integrates with external APIs like Numbers API and Wikipedia.
-Features
+# Number Classification API
 
-Mathematical Properties: Checks if a number is prime, perfect, or an Armstrong number.
+This API analyzes a number and returns its mathematical properties, a fun fact, and parity information. It is built using Node.js and Express and integrates with external APIs like Numbers API and Wikipedia.
 
-** Digit Sum: Calculates the sum of the digits of the number.
+## Features
 
-** Fun Fact: Fetches a fun fact about the number from the Numbers API.
+- **Mathematical Properties**: Checks if a number is prime, perfect, or an Armstrong number.
+- **Digit Sum**: Calculates the sum of the digits of the number.
+- **Fun Fact**: Fetches a fun fact about the number from the Numbers API.
+- **Parity Information**: Retrieves parity (odd/even) information from Wikipedia.
+- **Error Handling**: Returns a 400 Bad Request for invalid inputs.
 
-** Parity Information: Retrieves parity (odd/even) information from Wikipedia.
+## Analyze a Number
 
-** Error Handling: Returns a 400 Bad Request for invalid inputs.
+- **URL**: `/api-classify-number?n={number}`
+- **Method**: GET
+- **Response**: JSON with the analyzed data (number, properties, fun fact, and parity information).
 
-Analyze a Number
-** URL: /analyze/:number
+### Example Response:
 
-** Method: GET
+```json
+{
+  "number": 153,
+  "is_prime": false,
+  "is_perfect": false,
+  "is_armstrong": true,
+  "properties": ["armstrong", "odd", "positive"],
+  "digit_sum": 9,
+  "fun_fact": "153 is a narcissistic number.",
+  "parity_info": "Parity refers to the property of an integer's divisibility by 2."
+}
 
-** Response:
+Error Response (Invalid Input):
+{
+  "error": "Invalid number provided"
+}
 
-**Error Response (Invalid Input)
-URL: /analyze/alphabet
+Example of Invalid Input:
+1. URL: /api-classify-number?n=alphabet
+2. Method: GET
 
-Method: GET
-** Installation
-** Prerequisites
-** Node.js (v16 or higher)
-STEPS
-1.git clone https://github.com/Andred17/number-classification-api.git
+Installation
+1. Prerequisites
+1.1 Node.js (v16 or higher)
+git clone https://github.com/Andred17/number-classification-api.git
+
 cd number-classification-api
-2. Install dependencies
 npm install
-3. Start server 
 npm start
- ** To deploy
- 1. Install the Vercel CLI:
- npm install -g vercel
- 2. vercel
 
- TECHNOLOGIES USED IN TASK 
- 1. Express : Web framework for handling HTTP requests.
- 2. Axios : HTTP client for making requests to external APIs.
- 3. Node.js : JavaScript runtime for building the API.
- 4. Cors  : Middleware to enable Cross-Origin Resource Sharing.
- 5. Vercel : Platform for deploying the API.
-
- CONTRIBUTING 
- 1. Fork repo
- 2. create a new branch 
- git checkout -b feature/your-feature-name
- 3. Commit changes 
- git commit -m "Add your feature"
- 4. Push branch 
- git push origin feature/your-feature-name
-
- OPEN A PULL REQUEST
+To deploy 
+Vercel, render e.t.c can be used.
