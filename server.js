@@ -1,4 +1,4 @@
-import express from "express";
+import express from "express"; 
 import axios from "axios";
 import cors from "cors";
 import compression from "compression";
@@ -14,7 +14,6 @@ app.use(cors());
 app.use(compression());
 app.use(express.json());
 
-
 // Middleware to validate number input
 const validateNumber = (req, res, next) => {
     const { n } = req.query;
@@ -28,18 +27,17 @@ const validateNumber = (req, res, next) => {
     next();
 };
 
-
 // Cache for external API responses
 const externalCache = new NodeCache({ stdTTL: 86400 }); // Cache for 24 hours
 
 // Fetch fun fact from Numbers API (with caching)
 const fetchFunFact = async (n) => {
-    const cacheKey = `funFact-${n}`;
+    const cacheKey = `funFact-${n}`;  // Corrected interpolation
     const cachedData = externalCache.get(cacheKey);
     if (cachedData) return cachedData;
 
     try {
-        const response = await axios.get(`http://numbersapi.com/${n}`);
+        const response = await axios.get(`http://numbersapi.com/${n}`);  // Corrected interpolation
         externalCache.set(cacheKey, response.data);
         return response.data;
     } catch {
@@ -55,7 +53,7 @@ const fetchParityInfo = async () => {
 
     try {
         const response = await axios.get(
-            "https://en.wikipedia.org/api/rest_v1/page/summary/Parity_(mathematics)"
+            "https://en.wikipedia.org/wiki/Parity_(mathematics)"
         );
         const parityInfo = response.data.extract || "No parity information available.";
         externalCache.set(cacheKey, parityInfo);
@@ -92,7 +90,6 @@ app.get("/api-classify-number", validateNumber, async (req, res) => {
             number: num,
             is_prime: isPrime,
             is_perfect: isPerfect,
-            is_armstrong: isArmstrong,
             properties,
             digit_sum: digitSum,
             fun_fact: funFact,
