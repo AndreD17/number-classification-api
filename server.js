@@ -8,50 +8,30 @@ import { checkPrime, checkPerfect, checkArmstrong, getDigitsSum, classifyPropert
 const app = express();
 const PORT = process.env.PORT || 3000;
 const cache = new NodeCache({ stdTTL: 86400 }); // Cache responses for 24 hours
+const externalCache = new NodeCache({ stdTTL: 86400 }); // External API Cache
 
 // Middleware
 app.use(cors());
 app.use(compression());
 app.use(express.json());
 
-// Middleware to validate number input
-const validateNumber = (req, res, next) => {
-    const { n } = req.query; // 
-
-    // Check if n is not provided or it's not an integer
-    if (!n || !/^-?\d+$/.test(n)) {
-        return res.status(400).json({
-            number: n || null,
-            error: true,
-        });
-    }
-    req.num = parseInt(n, 10);
-    next();
-};
-
-// Cache for external API responses
-const externalCache = new NodeCache({ stdTTL: 86400 }); // Cache for 24 hours
-
 // Fetch fun fact from Numbers API (with caching)
-const fetchFunFact = async (n, isArmstrong) => {
-    const cacheKey = `funFact-${n}`;
+const fetchFunFact = async (num, isArmstrong) => {
+    const cacheKey = `funFact-${num}`;
     const cachedData = externalCache.get(cacheKey);
     if (cachedData) return cachedData;
 
     try {
-        // Fetch both API responses in parallel
         const [numbersApiResponse, wikipediaResponse] = await Promise.all([
-            axios.get(`http://numbersapi.com/${n}?json`).then(res => res.data.text),
+            axios.get(`http://numbersapi.com/${num}?json`).then(res => res.data.text),
             axios.get("https://en.wikipedia.org/api/rest_v1/page/summary/Parity_(mathematics)")
                 .then(res => res.data.extract)
                 .catch(() => "")
         ]);
 
-        // If Armstrong, replace Wikipedia info with the Armstrong breakdown
         let funFact = numbersApiResponse;
         if (isArmstrong) {
-            const armstrongCalculation = getArmstrongCalculation(n);
-            funFact += ` It is an Armstrong number because: ${armstrongCalculation}.`;
+            funFact += ` It is an Armstrong number.`;
         } else {
             funFact += wikipediaResponse ? ` ${wikipediaResponse}` : "";
         }
@@ -63,8 +43,18 @@ const fetchFunFact = async (n, isArmstrong) => {
     }
 };
 
-app.get("/api-classify-number", validateNumber, async (req, res) => {
-    const num = req.num;
+// Number classification API
+app.get("/api-classify-number", async (req, res) => {
+    const { number } = req.query;
+
+    if (!number || !/^-?\d+$/.test(number)) {
+        return res.status(400).json({
+            number: number || null,
+            error: true,
+        });
+    }
+
+    const num = parseInt(number, 10);
 
     // Check cache first
     const cachedData = cache.get(num);
@@ -77,23 +67,19 @@ app.get("/api-classify-number", validateNumber, async (req, res) => {
     const isPerfect = checkPerfect(num);
     const isArmstrong = checkArmstrong(num);
     const digitSum = getDigitsSum(num);
-
-    // Pass "armstrong" if the number is Armstrong, or "null" if it is not
     const properties = classifyProperties(num, isArmstrong ? "armstrong" : null);
 
     // Fetch data in parallel
     try {
-        const [funFact, parityInfo] = await Promise.all([
-            fetchFunFact(num),
-        ]);
+        const funFact = await fetchFunFact(num, isArmstrong);
 
         const responseData = {
             number: num,
             is_prime: isPrime,
             is_perfect: isPerfect,
             properties,
-            digit_sum: `${digitSum} // sum of its digits`,
-            fun_fact:`${funFact} // gotten from number api`,
+            digit_sum: digitSum,
+            fun_fact: funFact,
         };
 
         // Store response in cache
@@ -106,10 +92,7 @@ app.get("/api-classify-number", validateNumber, async (req, res) => {
 
 // Catch-all Route for Invalid URLs
 app.use((req, res) => {
-    res.status(400).json({
-        error: true,
-        message: "Invalid request Check the endpoint and parameters.",
-    });
+    res.status(400).json({ error: true, message: "Invalid request. Check the endpoint and parameters." });
 });
 
 app.listen(PORT, () => {
